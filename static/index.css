@@ -1,0 +1,26 @@
+body {
+    background-color: #222;
+    /*background-color: #aaa;*/
+    color: #eee;
+}
+
+
+#block-container {
+  background-size: cover;
+  /*border: 2px;*/
+
+  padding: 2rem 1rem;
+
+  /* Grid styles */
+  display: grid;
+  align-items: center;
+  grid-gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+block {
+    border-radius: 5px;
+    background-color: #333;
+    /*display: inline;*/
+    padding: 1rem;
+}
