@@ -94,7 +94,7 @@ function policy({x, y, theta_dot}, p) {
             return clip(torques[i], -2, 2);
         }
     }
-    return 0;  // None of our conditions were met. Do nothing.
+    return 0;  // Do nothing if no condition was met
 }
 
 
