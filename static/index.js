@@ -1,5 +1,6 @@
 import TitleScreen from "./TitleScreen.js";
 import Level1 from "./level1.js";
+import Level2 from "./level2.js";
 import WinScreen from "./WinScreen.js";
 
 async function main() {
@@ -7,6 +8,7 @@ async function main() {
     const levels = [
         new TitleScreen(block_container),
         new Level1(block_container),
+        new Level2(block_container),
         new WinScreen(block_container),
     ]
     let level_index = 0;

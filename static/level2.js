@@ -63,20 +63,38 @@ class Environment {
         return {
             theta: this.theta,
             theta_dot: this.theta_dot,
-            x: cos(this.theta),
-            y: sin(this.theta),
+            x: sin(this.theta),
+            y: cos(this.theta),
         };
     }
 }
 
 
-function policy({theta, theta_dot}, p) {
-    let torque = (
-        p('theta_weight') * theta +
-        p('theta_dot_weight') * theta_dot
-    );
+function policy({x, y, theta_dot}, p) {
+    // Build conditions and potential output
+    let conditions = [], torques = [];
+    for (let i=0; i<3; ++i) {
+        conditions.push(  // true iff cond < bias
+            x * p(`x cond (${i})`) +
+            y * p(`y cond (${i})`) +
+            theta_dot * p(`theta. cond (${i})`)
+            <
+            p(`bias (${i})`)
+        );
+        torques.push(
+            x * p(`x torque (${i})`) +
+            y * p(`y torque (${i})`) +
+            theta_dot * p(`theta. torque (${i})`)
+        );
+    }
 
-    return clip(torque, -2, 2);
+    // Select the first torque where the condition matches
+    for (let i=0; i<3; ++i) {
+        if (conditions[i]) {
+            return clip(torques[i], -2, 2);
+        }
+    }
+    return 0;  // None of our conditions were met. Do nothing.
 }
 
 
@@ -95,7 +113,7 @@ export function average_total_reward(seeds, params) {
     return sum(rewards) / rewards.length;
 }
 
-export default class Level1 {
+export default class Level2 {
     constructor(block_container) {
         this.block_container = block_container;
         this.level_done = null;  // level succeeded.
@@ -170,11 +188,12 @@ export default class Level1 {
         const info_block = block_container
             .append('block')
             .classed('info', true)
-        info_block.append('h2').text('Level 1')
+        info_block.append('h2').text('Level 2')
         info_block.append('div').text(`
-            In this scenario rewards you for to adjusting parameters to keep the paddle upright
-            using as little torque as necessary.
-            There is no strict win condition, (~-520 is good) try to find some interesting states.
+            Now try to do better with a bigger model!
+            In this policy we have a choose select the first condition that matches
+            and then apply torque based on some additional parameters.
+            Try beating the developer-score of -280.
         `)
         const navigation = info_block.append('div')
         navigation.append('a')
@@ -271,7 +290,7 @@ export default class Level1 {
                 ,
                 update => {
                     // const block = update.select('block');
-                    // update.select('.theta').text(d => d.env.theta);
+                    // update.select('.theta').text(d => d.env.make_observation().x);
                     // update.select('.theta_dot').text(d => d.env.theta_dot);
                     const paddle_r = 80;
                     update.select('.paddle')
