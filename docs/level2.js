@@ -154,7 +154,7 @@ export default class Level2 {
 
         // updates the metasmodel one step (all envs)
         function physics_step() {
-            num_envs = p('num_simulations')
+            num_envs = max(0, parseInt(p('num_simulations')));
             while (metas.length > num_envs) metas.pop();
             while (metas.length < num_envs) metas.push(new_meta());
             for (let i=0; i<metas.length; ++i) {
