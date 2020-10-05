@@ -173,7 +173,7 @@ export default class Level1 {
         info_block.append('h2').text('Level 1')
         info_block.append('div').text(`
             This scenario rewards you for adjusting parameters to keep the paddle upright
-            using as little torque as necessary.
+            , using as little torque as necessary.
             There is no strict win condition, (~-520 is good) try to find some interesting states.
         `)
         const navigation = info_block.append('div')
