@@ -24,3 +24,29 @@ block {
     /*display: inline;*/
     padding: 1rem;
 }
+
+block > h2 {
+    margin-top: 0;
+}
+
+
+.params input {
+    width: 100px;
+}
+.params .label {
+    text-align: right;
+}
+/*.params form {
+    text-align: right;
+}
+.params label, .params input {
+    display: inline-block;
+        text-align: right;
+
+}*/
+
+/*
+svg {
+    will-change: contents;
+}
+*/
