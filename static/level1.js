@@ -172,7 +172,7 @@ export default class Level1 {
             .classed('info', true)
         info_block.append('h2').text('Level 1')
         info_block.append('div').text(`
-            In this scenario rewards you for to adjusting parameters to keep the paddle upright
+            This scenario rewards you for adjusting parameters to keep the paddle upright
             using as little torque as necessary.
             There is no strict win condition, (~-520 is good) try to find some interesting states.
         `)
