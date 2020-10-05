@@ -183,7 +183,13 @@ export default class Level2 {
             .style('grid-column-start', 1)
             .style('grid-column-end', 3)
         policy_block.append('h2').text('Policy')
-        policy_block.append('pre').text(''+policy).style('overflow-x', 'auto')
+        policy_block.append('pre').append('code')
+            .classed('language-javascript', true)
+            .text(''+policy)
+            .style('overflow-x', 'auto')
+        document.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightBlock(block);
+        });
 
         const info_block = block_container
             .append('block')
