@@ -199,6 +199,7 @@ export default class Level2 {
             Now try to do better with a bigger model!
             In this policy we have a choose select the first condition that matches
             and then apply torque based on some additional parameters.
+            if we had x=.1 and y=.99, then that would be a state where the paddle is near-vertical up, leaning slightly right.
             Try beating the developer-score of -280.
         `)
         const navigation = info_block.append('div')
