@@ -33,6 +33,9 @@ block > h2 {
 .params input {
     width: 100px;
 }
+.params input.invalid {
+    background-color: #eaa;
+}
 .params .label {
     text-align: right;
 }

@@ -12,11 +12,12 @@ class Environment {
     constructor(seed) {
         const rng = new Random(seed);
         this.theta = TAU * rng.uniform01();
-        this.theta_dot = dt * rng.uniform01();
+        this.theta_dot = rng.uniform01();
     }
 
     step(action) {
-        this.theta += this.theta_dot;
+        this.theta_dot += action * dt;
+        this.theta += this.theta_dot * dt;
         this.theta = this.theta % TAU;
         if (this.theta < 0) {
             this.theta += TAU;
@@ -34,13 +35,13 @@ class Environment {
 }
 
 
-function policy(observation, p) {
+function policy({theta, theta_dot}, p) {
     let torque = (
-        p('theta') * observation.theta +
-        p('theta_dot') * observation.theta_dot
+        p('theta') * theta +
+        p('theta_dot') * theta_dot
     );
 
-    const max_torque = 2;
+    const max_torque = 20;
     torque = min( max_torque, torque);
     torque = max(-max_torque, torque);
     return torque;
@@ -72,10 +73,10 @@ export default class Level1 {
     start() {
         this.block_container.html('')
 
-        let num_envs = 3;
         const rng = new Random("lots of apples");
-        const results = [];
-        const metas = [];  // { env, total_reward, seed }
+        let num_envs = 3;
+        let results = [];
+        let metas = [];  // { env, total_reward, seed }
         function new_meta() {
             const seed = rng.int32().toString(16).padStart(8, '0');
             return {
@@ -92,8 +93,9 @@ export default class Level1 {
         {   // Initialize params via a single trace call.
             const trace_env = new Environment("YAAA");
             const trace_p = (param_name) => {
-                param_name_to_index[param_name] = params.length;
-                params.push({name: param_name, val: 0});
+                const i = params.length
+                param_name_to_index[param_name] = i;
+                params.push({i, name: param_name, val: 0});
                 return p(param_name);
             }
             policy(trace_env.make_observation(), trace_p);
@@ -131,10 +133,24 @@ export default class Level1 {
         policy_block.append('h2').text('Policy')
         policy_block.append('pre').text(''+policy).style('overflow-x', 'auto')
 
+        // parameters
         const param_block = block_container.append('block').classed('params', true)
         param_block.append('h2').text('Parameters')
         const param_table = param_block.append('table')
-        function update_params(params) {
+        function on_parameter_change(event, parameter) {
+            const el = event.srcElement;
+            const val = parseFloat(el.value);
+            if (!isFinite(val)) {
+                el.classList.add('invalid');
+                return;
+            }
+            el.classList.remove('invalid');
+            if (val == parameter.val) return;
+            parameter.val = val;
+            render_params(params);
+            metas = metas.map(() => new_meta());
+        }
+        function render_params(params) {
             function update_row(selection) {
                 selection.select('input').attr('value', d => d.val)
             }
@@ -145,16 +161,20 @@ export default class Level1 {
                     enter => {
                         const row = enter.append('tr').classed('param-row', true);
                         row.append('td').text(d => d.name + '').classed('label', true)
-                        row.append('td').append('input').attr('type', 'number')
+                        row.append('td').append('input')
+                            .attr('type', 'number')
+                            .on('change', on_parameter_change)
+                            .on('keyup', on_parameter_change)
                         update_row(row)
                     }
                     ,
                     update_row
                 )
         }
-        update_params(params);
+        render_params(params);
 
-        function update_metas(metas) {
+
+        function render_metas(metas) {
             const svg_r = 100;
             block_container
                 .selectAll('block.env')
@@ -213,7 +233,7 @@ export default class Level1 {
                 console.log('oh no, your computer can not keep up. :(')
             }
 
-            update_metas(metas);
+            render_metas(metas);
             window.requestAnimationFrame(render);
         }
         window.requestAnimationFrame(render);
