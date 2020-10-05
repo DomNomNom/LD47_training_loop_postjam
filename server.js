@@ -10,7 +10,7 @@ const app = express();
 //   console.log("Server started on: http://localhost:4747/");
 // });
 
-const static_dir = path.join(__dirname, "static");
+const static_dir = path.join(__dirname, "docs");
 app.use(express.static(static_dir));
 app.set('port', 4747);
 app.get("/", (req, res) => {
@@ -39,33 +39,3 @@ reload(app).then(function (reloadReturned) {
 }).catch(function (err) {
   console.error('Reload could not start, could not start server/sample app', err)
 })
-
-
-
-
-
-
-
-
-// console.log('hi')
-// const startServer = async () => {
-//     const reloadReturned = await reload(app);
-
-//     watch.watchTree(static_dir, (f, curr, prev) => {
-//         // Fire server-side reload event
-//         reloadReturned.reload();
-//         console.log('html reload.')
-//     })
-// }
-// startServer();
-// const server = http.createServer(app)
-// reload(app).then(function (reloadReturned) {
-//   // reloadReturned is documented in the returns API in the README
-
-//   // Reload started, start web server
-//   server.listen(app.get('port'), function () {
-//     console.log('Web server listening on port ' + app.get('port'))
-//   })
-// }).catch(function (err) {
-//   console.error('Reload could not start, could not start server/sample app', err)
-// })
