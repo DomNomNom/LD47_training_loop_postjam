@@ -7,29 +7,64 @@ const TAU = 2 * Math.PI;
 
 const dt = 1/120.;  // Physics timestep
 
+function angle_normalize(x) {
+    x = x % TAU;
+    if (x < 0) {
+        x += TAU;
+    }
+    x = (x <= PI)? x : x - TAU
+    return x;
+}
+function clip(x, bot, top) {
+    return max(min(x, top), bot);
+}
+function sum(list) {
+    return list.reduce((a,b) => a+b, 0);
+}
+
+
 // debugger
 class Environment {
     constructor(seed) {
         const rng = new Random(seed);
         this.theta = TAU * rng.uniform01();
         this.theta_dot = rng.uniform01();
+
+        this.max_speed = 8
+        this.max_torque = 2.
+        this.dt = .04
+        this.g = 10
+        this.m = 1
+        this.l = 1
+        this.last_torque = 0
     }
 
-    step(action) {
-        this.theta_dot += action * dt;
-        this.theta += this.theta_dot * dt;
-        this.theta = this.theta % TAU;
-        if (this.theta < 0) {
-            this.theta += TAU;
-        }
-        this.theta = (this.theta <= PI)? this.theta : this.theta - TAU
-        return 1;
+    step(torque) {
+        // this.theta_dot += action * dt;
+        // this.theta += this.theta_dot * dt;
+        // return 1;
+        // dt = this.dt
+        let {theta, theta_dot, g, m, l, dt} = this;
+
+        torque = clip(torque, -this.max_torque, this.max_torque)
+        this.last_torque = torque;
+        let costs = angle_normalize(theta) ** 2 + .1 * theta_dot ** 2 + .001 * (torque ** 2)
+
+        let newthdot = theta_dot + (-3 * g / (2 * l) * sin(theta + PI) + 3. / (m * l ** 2) * torque) * dt
+        let newth = theta + newthdot * dt
+        newthdot = clip(newthdot, -this.max_speed, this.max_speed)
+
+        this.theta = angle_normalize(newth)
+        this.theta_dot = newthdot
+        return -costs
     }
 
     make_observation() {
         return {
             theta: this.theta,
             theta_dot: this.theta_dot,
+            x: cos(this.theta),
+            y: sin(this.theta),
         };
     }
 }
@@ -37,14 +72,11 @@ class Environment {
 
 function policy({theta, theta_dot}, p) {
     let torque = (
-        p('theta') * theta +
-        p('theta_dot') * theta_dot
+        p('theta_weight') * theta +
+        p('theta_dot_weight') * theta_dot
     );
 
-    const max_torque = 20;
-    torque = min( max_torque, torque);
-    torque = max(-max_torque, torque);
-    return torque;
+    return clip(torque, -2, 2);
 }
 
 
@@ -60,7 +92,7 @@ export function average_total_reward(seeds, params) {
         }
         return total_reward;
     });
-    return rewards.reduce((a,b) => a+b, 0) / rewards.length;
+    return sum(rewards) / rewards.length;
 }
 
 export default class Level1 {
@@ -74,8 +106,8 @@ export default class Level1 {
         this.block_container.html('')
 
         const rng = new Random("lots of apples");
-        let num_envs = 3;
-        let results = [];
+        let num_envs = 6;
+        let rewards = [];
         let metas = [];  // { env, total_reward, seed }
         function new_meta() {
             const seed = rng.int32().toString(16).padStart(8, '0');
@@ -98,11 +130,13 @@ export default class Level1 {
                 params.push({i, name: param_name, val: 0});
                 return p(param_name);
             }
+            trace_p('num_simulations'); params[params.length-1].val = num_envs;
             policy(trace_env.make_observation(), trace_p);
         }
 
         // updates the metasmodel one step (all envs)
         function physics_step() {
+            num_envs = p('num_simulations')
             while (metas.length > num_envs) metas.pop();
             while (metas.length < num_envs) metas.push(new_meta());
             for (let i=0; i<metas.length; ++i) {
@@ -110,8 +144,8 @@ export default class Level1 {
                 const action = policy(meta.env.make_observation(), p);
                 meta.total_reward += meta.env.step(action);
                 meta.ticks += 1;
-                if (meta.ticks > 1000) {
-                    results.push({i, total_reward: meta.total_reward});
+                if (meta.ticks > max_steps) {
+                    rewards.push(meta.total_reward);
                     metas[i] = new_meta();
                 }
             }
@@ -133,6 +167,26 @@ export default class Level1 {
         policy_block.append('h2').text('Policy')
         policy_block.append('pre').text(''+policy).style('overflow-x', 'auto')
 
+        const info_block = block_container
+            .append('block')
+            .classed('info', true)
+        info_block.append('h2').text('Level 1')
+        info_block.append('div').text(`
+            In this scenario rewards you for to adjusting parameters to keep the paddle upright
+            using as little torque as necessary.
+            There is no strict win condition, (~500 is good) try to find some interesting states.
+        `)
+        const navigation = info_block.append('div')
+        navigation.append('a')
+            .text('Back')
+            .attr('href', '#')
+            .on('click', () => this.level_done(-1))
+        navigation.append('span').text(' ')
+        navigation.append('a')
+            .text('Finish')
+            .attr('href', '#')
+            .on('click', () => this.level_done(+1))
+
         // parameters
         const param_block = block_container.append('block').classed('params', true)
         param_block.append('h2').text('Parameters')
@@ -149,6 +203,7 @@ export default class Level1 {
             parameter.val = val;
             render_params(params);
             metas = metas.map(() => new_meta());
+            rewards = [];
         }
         function render_params(params) {
             function update_row(selection) {
@@ -173,6 +228,16 @@ export default class Level1 {
         }
         render_params(params);
 
+        let rewards_block = block_container.append('block').classed('rewards', true)
+        const format_reward = x => x.toFixed(2)
+        let average_reward_span = rewards_block
+            .append('h2')
+            .text(d => 'Average Reward: ')
+            .append('span')
+        function render_rewards(rewards) {
+            average_reward_span.text((rewards.length == 0)? '' : format_reward(sum(rewards) / rewards.length));
+        }
+        render_rewards(rewards);
 
         function render_metas(metas) {
             const svg_r = 100;
@@ -185,8 +250,8 @@ export default class Level1 {
                         .append('block')
                         .classed('env', true);
 
-                    block.append('div').classed('theta', true)
-                    block.append('div').classed('theta_dot', true)
+                    // block.append('div').classed('theta', true)
+                    // block.append('div').classed('theta_dot', true)
                     const svg = block.append('svg')
                         .style('width', '100%')
                         .style('height', 200)
@@ -206,7 +271,7 @@ export default class Level1 {
                 ,
                 update => {
                     // const block = update.select('block');
-                    update.select('.theta').text(d => d.env.theta);
+                    // update.select('.theta').text(d => d.env.theta);
                     // update.select('.theta_dot').text(d => d.env.theta_dot);
                     const paddle_r = 80;
                     update.select('.paddle')
@@ -217,7 +282,9 @@ export default class Level1 {
         }
 
         let last_physics_time;
+        let finished = false;
         function render(timestamp_ms) {
+            if (finished) return;
             const timestamp = timestamp_ms / 1000.;
             if (last_physics_time === undefined) {
                 physics_step();
@@ -234,6 +301,7 @@ export default class Level1 {
             }
 
             render_metas(metas);
+            render_rewards(rewards);
             window.requestAnimationFrame(render);
         }
         window.requestAnimationFrame(render);
@@ -243,6 +311,8 @@ export default class Level1 {
         return new Promise((level_done, reject) => {
             this.level_done = level_done;
             this.reject = reject;
-        })
+        }).finally(() => {
+            finished = true;
+        });
     }
 }

@@ -25,10 +25,20 @@ block {
     padding: 1rem;
 }
 
-block > h2 {
+block > h2, block > h1 {
     margin-top: 0;
 }
 
+.title-screen h1 {
+    font-size: 3em;
+}
+.title-screen pre {
+    font-size: 1.5em;
+}
+
+a {
+    color: #88f;
+}
 
 .params input {
     width: 100px;
