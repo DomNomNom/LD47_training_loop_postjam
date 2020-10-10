@@ -10,6 +10,7 @@ export function angle_normalize(x) {  // Returns x but within -pi .. pi
     return x;
 }
 
+
 export function clip(x, bot, top) {
     return max(min(x, top), bot);
 }
