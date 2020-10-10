@@ -8,6 +8,10 @@ input {
     color: #eee;
 }
 
+.hidden {
+  display: none;
+}
+
 #block-container {
   background-size: cover;
   /*border: 2px;*/
