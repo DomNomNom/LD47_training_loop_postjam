@@ -3,7 +3,7 @@ import {range, clip, sum} from "./utils.js"
 
 import {PendulumEnv} from "./environments.js"
 
-const {sin, cos, PI, min, max} = Math;
+const {sin, cos, PI, min, max, floor} = Math;
 const TAU = 2 * Math.PI;
 
 
@@ -56,6 +56,11 @@ export default class Level1 {
                 env: new PendulumEnv(seed),
                 total_reward: 0,
                 ticks: 0,
+
+                is_debug: false,
+                is_paused: false,
+                ticks_per_physics: 1,
+                requested_ticks: 0,  // How often the user clicked 'step' since last physics
             };
         }
 
@@ -82,12 +87,22 @@ export default class Level1 {
             for (let i=0; i<metas.length; ++i) {
                 const meta = metas[i];
                 const action = policy(meta.env.make_observation(), p);
-                meta.total_reward += meta.env.step(action);
-                meta.ticks += 1;
-                if (meta.ticks > max_steps) {
-                    rewards.push(meta.total_reward);
-                    metas[i] = new_meta();
+                const next_ticks = meta.ticks + meta.requested_ticks + ((meta.is_paused)? 0 : meta.ticks_per_physics);
+                meta.requested_ticks = 0;
+                let same_env = true;
+                for (let t=meta.ticks; t<floor(next_ticks) && same_env; ++t) {
+                    meta.total_reward += meta.env.step(action);
+                    if (meta.ticks > max_steps) {
+                        rewards.push(meta.total_reward);
+                        const n = new_meta();
+                        for (const key of ['seed', 'env', 'total_reward', 'ticks']) {
+                            meta[key] = n[key];
+                        }
+                        same_env = false;
+                    }
                 }
+                if (same_env) meta.ticks = next_ticks;
+                if (i==0) console.log(meta.is_debug, meta.is_paused, meta.ticks, next_ticks);
             }
         }
 
@@ -185,6 +200,7 @@ export default class Level1 {
         }
         render_rewards(rewards);
 
+
         function render_metas(metas) {
             const svg_r = 100;
             block_container
@@ -196,8 +212,28 @@ export default class Level1 {
                         .append('block')
                         .classed('env', true);
 
-                    // block.append('div').classed('theta', true)
-                    // block.append('div').classed('theta_dot', true)
+                    const debug_check_div = block.append('div')
+                    const debug_check = debug_check_div.append('input')
+                        .attr('type', 'checkbox')
+                        .attr('id', (d, i) => `is-debug-${i}`)
+                        .on('change', (e, d) => { d.is_debug = e.target.checked; })
+                    const debug_label = debug_check_div.append('label').text('Inspect').attr('for', (d, i) => `is-debug-${i}`)
+
+                    const debug_contents = block.append('div').classed('debug-contents hidden', true)
+                    const time_controls = debug_contents.append('div')
+                    time_controls.append('button')
+                        .text('slower')
+                        .on('click', (e, d) => { d.is_paused = false; d.ticks_per_physics /= 2; })
+                    time_controls.append('button')
+                        .text('step')
+                        .on('click', (e, d) => { d.is_paused = true; d.requested_ticks += 1; })
+                    time_controls.append('button')
+                        .text('play/pause')
+                        .on('click', (e, d) => { d.is_paused = !d.is_paused; })
+                    time_controls.append('button')
+                        .text('faster')
+                        .on('click', (e, d) => { d.is_paused = false; d.ticks_per_physics *= 2; })
+
                     const svg = block.append('svg')
                         .style('width', '100%')
                         .style('height', 200)
@@ -216,13 +252,13 @@ export default class Level1 {
                 }
                 ,
                 update => {
-                    // const block = update.select('block');
-                    // update.select('.theta').text(d => d.env.theta);
-                    // update.select('.theta_dot').text(d => d.env.theta_dot);
                     const paddle_r = 80;
                     update.select('.paddle')
                         .attr('x2', d => - paddle_r * sin(d.env.theta))
                         .attr('y2', d => - paddle_r * cos(d.env.theta))
+
+                    update.selectAll('.debug-contents')
+                        .classed('hidden', d => !d.is_debug)
                 }
             );
         }
