@@ -56,6 +56,18 @@ a {
 .params .label {
     text-align: right;
 }
+
+.debug-contents .seed-controls{
+  margin-top: 5px;
+}
+.debug-contents .seed-controls input[type='text'] {
+  width: 100px;
+}
+.debug-contents .debug_inout {
+  margin-top: 5px;
+  margin-bottom: 0px;
+}
+
 /*.params form {
     text-align: right;
 }
