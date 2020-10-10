@@ -7,8 +7,6 @@ const TAU = 2 * Math.PI;
 export class PendulumEnv {
     constructor(seed, {dt=.04}={}) {
         const rng = new Random(seed);
-        this.theta = TAU * rng.uniform01();
-        this.theta_dot = rng.uniform01();
 
         this.max_speed = 8
         this.max_torque = 2.
@@ -17,6 +15,9 @@ export class PendulumEnv {
         this.m = 1
         this.l = 1
         this.last_torque = 0
+
+        this.theta = PI * rng.uniform11();
+        this.theta_dot = .5 * this.max_speed * rng.uniform11();
     }
 
     step(torque) {

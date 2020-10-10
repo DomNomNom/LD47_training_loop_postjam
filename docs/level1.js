@@ -52,8 +52,8 @@ export default class Level1 {
         const params = []; // keys to params in insertion order.
         const param_name_to_index = {};
         const p = param_name => params[param_name_to_index[param_name]].val;
-        function new_meta() {
-            const seed = rng.int32().toString(16).padStart(8, '0');
+        function new_meta(seed=undefined) {
+            seed = (seed===undefined)? rng.int32().toString(16).padStart(8, '0') : seed;
             const env = new PendulumEnv(seed);
             const observation = env.make_observation();
             return {
@@ -63,15 +63,16 @@ export default class Level1 {
                 tick: 0,
                 observation,
                 action: policy(observation, p),
-
-                is_debug: true,
+                // Things below here are not merged in merge_new_meta
+                is_debug: false,
                 is_paused: false,
                 ticks_per_physics: 1,
                 requested_ticks: 0,  // How often the user clicked 'step' since last physics
+                randomize_seed: true,
             };
         }
         function merge_new_meta(meta) {
-            const n = new_meta();
+            const n = new_meta((meta.randomize_seed)? undefined : meta.seed);
             for (const key of ['seed', 'env', 'total_reward', 'tick', 'observation', 'action']) {
                 meta[key] = n[key];
             }
@@ -141,8 +142,8 @@ export default class Level1 {
             .classed('info', true)
         info_block.append('h2').text('Level 1')
         info_block.append('div').text(`
-            This scenario rewards you for adjusting parameters to keep the paddle upright
-            , using as little torque as necessary.
+            This scenario rewards you for adjusting parameters to keep the paddle upright,
+            using as little torque as necessary.
             There is no strict win condition, (~-520 is good) try to find some interesting states.
         `)
         const navigation = info_block.append('div')
@@ -241,6 +242,25 @@ export default class Level1 {
                     time_controls.append('button')
                         .text('faster')
                         .on('click', (e, d) => { d.is_paused = false; d.ticks_per_physics *= 2; })
+                    const seed_controls = debug_contents.append('div').classed('seed-controls', true);
+                    seed_controls.append('span').text('Seed: ')
+                    const on_change_seed = (e, d) => {
+                        d.seed = e.target.value;
+                        d.randomize_seed = false;
+                        merge_new_meta(d);
+                    };
+                    seed_controls.append('input')
+                        .attr('type', 'text')
+                        .classed('seed-input', true)
+                        .on('input', on_change_seed)
+                        // .on('keyup', on_change_seed)
+                    const make_seed_randomize_id = (d, i) => `randomize-seed-${i}`;
+                    seed_controls.append('input')
+                        .classed('randomize-seed', true)
+                        .attr('type', 'checkbox')
+                        .attr('id', make_seed_randomize_id)
+                        .on('change', (e,d) => { d.randomize_seed = e.target.checked; })
+                    seed_controls.append('label').text('random').attr('for', make_seed_randomize_id)
                     debug_contents.append('pre').classed('debug_inout', true)
 
                     const svg = block.append('svg')
@@ -276,6 +296,8 @@ export default class Level1 {
                             `action: ${format_obj(d.action)}`,
                         ].join('\n')
                     )
+                    update.selectAll('.seed-input').each(function(d) {  if (this.value != d.seed) this.value = d.seed; })
+                    update.selectAll('.randomize-seed').property('checked', d => d.randomize_seed)
                 }
             );
         }
