@@ -43,8 +43,8 @@ export class PendulumEnv {
         return {
             theta: this.theta,
             theta_dot: this.theta_dot,
-            x: cos(this.theta),
-            y: sin(this.theta),
+            x: sin(this.theta),
+            y: cos(this.theta),
         };
     }
 }

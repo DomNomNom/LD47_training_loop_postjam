@@ -20,13 +20,13 @@ function policy({theta, theta_dot}, p) {
 }
 
 
-const max_steps = 100;
+const num_ticks = 100;
 export function average_total_reward(seeds, params) {
     const p = param_name => params[param_name];
     const rewards = seeds.map(seed => {
         const env = new PendulumEnv(seed);
         let total_reward = 0;
-        for (let i=0; i<max_steps; ++i) {
+        for (let i=0; i<num_ticks; ++i) {
             const action = policy(env.make_observation(), p);
             total_reward += env.step(action);
         }
@@ -48,25 +48,35 @@ export default class Level1 {
         const rng = new Random("lots of apples");
         let num_envs = 6;
         let rewards = [];
-        let metas = [];  // { env, total_reward, seed }
+        const metas = [];  // { env, total_reward, seed }
+        const params = []; // keys to params in insertion order.
+        const param_name_to_index = {};
+        const p = param_name => params[param_name_to_index[param_name]].val;
         function new_meta() {
             const seed = rng.int32().toString(16).padStart(8, '0');
+            const env = new PendulumEnv(seed);
+            const observation = env.make_observation();
             return {
                 seed,
-                env: new PendulumEnv(seed),
+                env,
                 total_reward: 0,
-                ticks: 0,
+                tick: 0,
+                observation,
+                action: policy(observation, p),
 
-                is_debug: false,
+                is_debug: true,
                 is_paused: false,
                 ticks_per_physics: 1,
                 requested_ticks: 0,  // How often the user clicked 'step' since last physics
             };
         }
+        function merge_new_meta(meta) {
+            const n = new_meta();
+            for (const key of ['seed', 'env', 'total_reward', 'tick', 'observation', 'action']) {
+                meta[key] = n[key];
+            }
+        }
 
-        const params = []; // keys to params in insertion order.
-        const param_name_to_index = {};
-        const p = param_name => params[param_name_to_index[param_name]].val;
         {   // Initialize params via a single trace call.
             const trace_env = new PendulumEnv("YAAA");
             const trace_p = (param_name) => {
@@ -86,23 +96,21 @@ export default class Level1 {
             while (metas.length < num_envs) metas.push(new_meta());
             for (let i=0; i<metas.length; ++i) {
                 const meta = metas[i];
-                const action = policy(meta.env.make_observation(), p);
-                const next_ticks = meta.ticks + meta.requested_ticks + ((meta.is_paused)? 0 : meta.ticks_per_physics);
+                const next_tick = meta.tick + meta.requested_ticks + ((meta.is_paused)? 0 : meta.ticks_per_physics);
                 meta.requested_ticks = 0;
                 let same_env = true;
-                for (let t=meta.ticks; t<floor(next_ticks) && same_env; ++t) {
-                    meta.total_reward += meta.env.step(action);
-                    if (meta.ticks > max_steps) {
-                        rewards.push(meta.total_reward);
-                        const n = new_meta();
-                        for (const key of ['seed', 'env', 'total_reward', 'ticks']) {
-                            meta[key] = n[key];
-                        }
-                        same_env = false;
-                    }
+                let t = floor(meta.tick);
+                for (; t+1 <= next_tick && t < num_ticks; ++t) {
+                    meta.total_reward += meta.env.step(meta.action);
+                    meta.observation = meta.env.make_observation();
+                    meta.action = policy(meta.observation, p);
                 }
-                if (same_env) meta.ticks = next_ticks;
-                if (i==0) console.log(meta.is_debug, meta.is_paused, meta.ticks, next_ticks);
+                if (t < num_ticks) {
+                    meta.tick = next_tick;
+                } else {
+                    rewards.push(meta.total_reward);
+                    merge_new_meta(meta);
+                }
             }
         }
 
@@ -163,7 +171,7 @@ export default class Level1 {
             if (val == parameter.val) return;
             parameter.val = val;
             render_params(params);
-            metas = metas.map(() => new_meta());
+            metas.forEach(merge_new_meta);
             rewards = [];
         }
         function render_params(params) {
@@ -225,14 +233,15 @@ export default class Level1 {
                         .text('slower')
                         .on('click', (e, d) => { d.is_paused = false; d.ticks_per_physics /= 2; })
                     time_controls.append('button')
-                        .text('step')
-                        .on('click', (e, d) => { d.is_paused = true; d.requested_ticks += 1; })
-                    time_controls.append('button')
                         .text('play/pause')
                         .on('click', (e, d) => { d.is_paused = !d.is_paused; })
                     time_controls.append('button')
+                        .text('step')
+                        .on('click', (e, d) => { d.is_paused = true; d.requested_ticks += 1; })
+                    time_controls.append('button')
                         .text('faster')
                         .on('click', (e, d) => { d.is_paused = false; d.ticks_per_physics *= 2; })
+                    debug_contents.append('pre').classed('debug_inout', true)
 
                     const svg = block.append('svg')
                         .style('width', '100%')
@@ -254,17 +263,26 @@ export default class Level1 {
                 update => {
                     const paddle_r = 80;
                     update.select('.paddle')
-                        .attr('x2', d => - paddle_r * sin(d.env.theta))
-                        .attr('y2', d => - paddle_r * cos(d.env.theta))
+                        .attr('x2', d => - paddle_r * d.observation.x)
+                        .attr('y2', d => - paddle_r * d.observation.y)
 
                     update.selectAll('.debug-contents')
                         .classed('hidden', d => !d.is_debug)
+                    const format_obj = x => JSON.stringify(x, null, '  ')
+                    update.selectAll('.debug_inout').text(
+                        d => [
+                            `tick: ${d.tick}`,
+                            `observation: ${format_obj(d.observation)}`,
+                            `action: ${format_obj(d.action)}`,
+                        ].join('\n')
+                    )
                 }
             );
         }
 
         let last_physics_time;
         let finished = false;
+        let num_spiral_of_death_avoids = 0;
         function render(timestamp_ms) {
             if (finished) return;
             const timestamp = timestamp_ms / 1000.;
@@ -279,7 +297,10 @@ export default class Level1 {
             }
             if (last_physics_time + dt <= timestamp) {
                 last_physics_time = timestamp;
-                console.log('oh no, your computer can not keep up. :(')
+                num_spiral_of_death_avoids++;
+                if (num_spiral_of_death_avoids > 100) {
+                    console.log('oh no, your computer can not keep up. :(')
+                }
             }
 
             render_metas(metas);
