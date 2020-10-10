@@ -1,9 +1,12 @@
 body {
     background-color: #222;
-    /*background-color: #aaa;*/
     color: #eee;
 }
 
+input {
+    background-color: #222;
+    color: #eee;
+}
 
 #block-container {
   background-size: cover;

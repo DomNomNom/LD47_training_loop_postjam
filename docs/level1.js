@@ -1,73 +1,13 @@
 import Random from "./random.js"
-import {range} from "./utils.js"
+import {range, clip, sum} from "./utils.js"
+
+import {PendulumEnv} from "./environments.js"
 
 const {sin, cos, PI, min, max} = Math;
 const TAU = 2 * Math.PI;
 
 
 const dt = 1/120.;  // Physics timestep
-
-function angle_normalize(x) {
-    x = x % TAU;
-    if (x < 0) {
-        x += TAU;
-    }
-    x = (x <= PI)? x : x - TAU
-    return x;
-}
-function clip(x, bot, top) {
-    return max(min(x, top), bot);
-}
-function sum(list) {
-    return list.reduce((a,b) => a+b, 0);
-}
-
-
-// debugger
-class Environment {
-    constructor(seed) {
-        const rng = new Random(seed);
-        this.theta = TAU * rng.uniform01();
-        this.theta_dot = rng.uniform01();
-
-        this.max_speed = 8
-        this.max_torque = 2.
-        this.dt = .04
-        this.g = 10
-        this.m = 1
-        this.l = 1
-        this.last_torque = 0
-    }
-
-    step(torque) {
-        // this.theta_dot += action * dt;
-        // this.theta += this.theta_dot * dt;
-        // return 1;
-        // dt = this.dt
-        let {theta, theta_dot, g, m, l, dt} = this;
-
-        torque = clip(torque, -this.max_torque, this.max_torque)
-        this.last_torque = torque;
-        let costs = angle_normalize(theta) ** 2 + .1 * theta_dot ** 2 + .001 * (torque ** 2)
-
-        let newthdot = theta_dot + (-3 * g / (2 * l) * sin(theta + PI) + 3. / (m * l ** 2) * torque) * dt
-        let newth = theta + newthdot * dt
-        newthdot = clip(newthdot, -this.max_speed, this.max_speed)
-
-        this.theta = angle_normalize(newth)
-        this.theta_dot = newthdot
-        return -costs
-    }
-
-    make_observation() {
-        return {
-            theta: this.theta,
-            theta_dot: this.theta_dot,
-            x: cos(this.theta),
-            y: sin(this.theta),
-        };
-    }
-}
 
 
 function policy({theta, theta_dot}, p) {
@@ -84,7 +24,7 @@ const max_steps = 100;
 export function average_total_reward(seeds, params) {
     const p = param_name => params[param_name];
     const rewards = seeds.map(seed => {
-        const env = new Environment(seed);
+        const env = new PendulumEnv(seed);
         let total_reward = 0;
         for (let i=0; i<max_steps; ++i) {
             const action = policy(env.make_observation(), p);
@@ -113,7 +53,7 @@ export default class Level1 {
             const seed = rng.int32().toString(16).padStart(8, '0');
             return {
                 seed,
-                env: new Environment(seed),
+                env: new PendulumEnv(seed),
                 total_reward: 0,
                 ticks: 0,
             };
@@ -123,7 +63,7 @@ export default class Level1 {
         const param_name_to_index = {};
         const p = param_name => params[param_name_to_index[param_name]].val;
         {   // Initialize params via a single trace call.
-            const trace_env = new Environment("YAAA");
+            const trace_env = new PendulumEnv("YAAA");
             const trace_p = (param_name) => {
                 const i = params.length
                 param_name_to_index[param_name] = i;
