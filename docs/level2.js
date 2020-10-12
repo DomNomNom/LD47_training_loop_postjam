@@ -1,27 +1,65 @@
-import Random from "./random.js"
-import {range} from "./utils.js"
+import {PendulumEnv} from "./environments.js"
+import {EvaluatorLevel} from './evaluators.js'
 
-const {sin, cos, PI, min, max} = Math;
-const TAU = 2 * Math.PI;
+import {clip} from "./utils.js"
 
 
-const dt = 1/120.;  // Physics timestep
 
-function angle_normalize(x) {
-    x = x % TAU;
-    if (x < 0) {
-        x += TAU;
+function policy({x, y, theta_dot}, p, log) {
+    // Build conditions and potential output
+    let conditions = [], torques = [];
+    for (let i=0; i<3; ++i) {
+        conditions.push(  // true iff cond < bias
+            x * p(`x cond (${i})`) +
+            y * p(`y cond (${i})`) +
+            theta_dot * p(`theta. cond (${i})`)
+            <
+            p(`bias (${i})`)
+        );
+        torques.push(
+            x * p(`x torque (${i})`) +
+            y * p(`y torque (${i})`) +
+            theta_dot * p(`theta. torque (${i})`)
+        );
     }
-    x = (x <= PI)? x : x - TAU
-    return x;
-}
-function clip(x, bot, top) {
-    return max(min(x, top), bot);
-}
-function sum(list) {
-    return list.reduce((a,b) => a+b, 0);
+
+    log({conditions, torques});
+
+    // Select the first torque where the condition matches
+    for (let i=0; i<3; ++i) {
+        if (conditions[i]) return clip(torques[i], -2, 2);
+    }
+    return 0;  // Do nothing if no condition was met
 }
 
+
+
+const level_info = `
+    Now try to do better with a bigger model!
+    In this policy we have a choose select the first condition that matches
+    and then apply torque based on some additional parameters.
+    if we had x=.1 and y=.99, then that would be a state where the paddle is near-vertical up, leaning slightly right.
+    Try beating the developer-score of -280.
+`;
+
+export default class Level2 {
+    constructor(block_container) {
+        this.eval_level = new EvaluatorLevel({
+            block_container,
+            policy,
+            env_class: PendulumEnv,
+            level_name: 'Level 2',
+            level_info,
+            num_ticks: 100,
+        })
+    }
+
+    async start() {
+        return await this.eval_level.start()
+    }
+}
+
+/*
 
 // debugger
 class Environment {
@@ -68,35 +106,6 @@ class Environment {
         };
     }
 }
-
-
-function policy({x, y, theta_dot}, p) {
-    // Build conditions and potential output
-    let conditions = [], torques = [];
-    for (let i=0; i<3; ++i) {
-        conditions.push(  // true iff cond < bias
-            x * p(`x cond (${i})`) +
-            y * p(`y cond (${i})`) +
-            theta_dot * p(`theta. cond (${i})`)
-            <
-            p(`bias (${i})`)
-        );
-        torques.push(
-            x * p(`x torque (${i})`) +
-            y * p(`y torque (${i})`) +
-            theta_dot * p(`theta. torque (${i})`)
-        );
-    }
-
-    // Select the first torque where the condition matches
-    for (let i=0; i<3; ++i) {
-        if (conditions[i]) {
-            return clip(torques[i], -2, 2);
-        }
-    }
-    return 0;  // Do nothing if no condition was met
-}
-
 
 const max_steps = 100;
 export function average_total_reward(seeds, params) {
@@ -195,13 +204,7 @@ export default class Level2 {
             .append('block')
             .classed('info', true)
         info_block.append('h2').text('Level 2')
-        info_block.append('div').text(`
-            Now try to do better with a bigger model!
-            In this policy we have a choose select the first condition that matches
-            and then apply torque based on some additional parameters.
-            if we had x=.1 and y=.99, then that would be a state where the paddle is near-vertical up, leaning slightly right.
-            Try beating the developer-score of -280.
-        `)
+        info_block.append('div').text()
         const navigation = info_block.append('div')
         navigation.append('a')
             .text('Back')
@@ -342,3 +345,4 @@ export default class Level2 {
         });
     }
 }
+*/

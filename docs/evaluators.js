@@ -9,11 +9,12 @@ const dt = 1/120.;  // Physics timestep
 
 export function average_total_reward(policy, env_class, seeds, params, num_ticks) {
     const p = param_name => params[param_name];
+    const log = () => {};
     const rewards = seeds.map(seed => {
         const env = new env_class(seed);
         let total_reward = 0;
         for (let i=0; i<num_ticks; ++i) {
-            const action = policy(env.make_observation(), p);
+            const action = policy(env.make_observation(), p, log);
             total_reward += env.step(action);
         }
         return total_reward;
@@ -42,13 +43,18 @@ export class EvaluatorLevel {
             seed = (seed===undefined)? rng.int32().toString(16).padStart(8, '0') : seed;
             const env = new this.env_class(seed);
             const observation = env.make_observation();
+            const logs = [];
+            let last_log = undefined;
+            const log = (obj) => { last_log = obj; }
+            const action = this.policy(observation, p, log);
             return {
                 seed,
                 env,
                 total_reward: 0,
                 tick: 0,
                 observation,
-                action: this.policy(observation, p),
+                action,
+                last_log,
                 // Things below here are not merged in merge_new_meta
                 is_debug: false,
                 is_paused: false,
@@ -73,7 +79,7 @@ export class EvaluatorLevel {
                 return p(param_name);
             }
             trace_p('num_simulations'); params[params.length-1].val = num_envs;
-            this.policy(trace_env.make_observation(), trace_p);
+            this.policy(trace_env.make_observation(), trace_p, () => {});
         }
 
         // updates the metasmodel one step (all envs)
@@ -87,10 +93,11 @@ export class EvaluatorLevel {
                 meta.requested_ticks = 0;
                 let same_env = true;
                 let t = floor(meta.tick);
+                const log = (obj) => {meta.last_log = obj};
                 for (; t+1 <= next_tick && t < this.num_ticks; ++t) {
                     meta.total_reward += meta.env.step(meta.action);
                     meta.observation = meta.env.make_observation();
-                    meta.action = this.policy(meta.observation, p);
+                    meta.action = this.policy(meta.observation, p, log);
                 }
                 if (t < this.num_ticks) {
                     meta.tick = next_tick;
@@ -276,6 +283,7 @@ export class EvaluatorLevel {
                             `tick: ${d.tick}`,
                             `observation: ${format_obj(d.observation)}`,
                             `action: ${format_obj(d.action)}`,
+                            (d.last_log === undefined)? '' : `log: ${format_obj(d.last_log)}`
                         ].join('\n')
                     )
                     update.selectAll('.seed-input').each(function(d) {  if (this.value != d.seed) this.value = d.seed; })
